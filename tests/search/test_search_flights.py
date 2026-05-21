@@ -264,6 +264,29 @@ class TestParsePriceInfo:
         ]
         assert SearchFlights._parse_price_info(data) == (118.0, "USD")
 
+    def test_parse_price_info_eastar_jet_live_token(self):
+        """Regression for issue #144: Eastar Jet ICN-NRT returns price=None.
+
+        Captured shape from a live 2026-06-15 ICN→NRT search for ZE6078: the
+        inner price head is empty (Google's "no shopping-list price" marker
+        for direct-only carriers without partner inventory) and the base64
+        token has no nested currency field. Before the fix landed in #166
+        this row reported ``price=0.0``, masking the carrier as a free fare;
+        downstream consumers worked around it with ``price <= 0`` filters,
+        dropping the entire carrier from view. Now ``price`` is ``None`` and
+        the row stays visible.
+        """
+        data = [
+            None,
+            [
+                [],
+                "CjRIRlNfZ0FHamhKdElBR3NHOVFCRy0tLS0tLS0tLW9rZXExOEFBQUFBR29IOEY4QXY4RGVBEgVaRTYwNzgc",
+            ],
+        ]
+        price, currency = SearchFlights._parse_price_info(data)
+        assert price is None
+        assert currency is None
+
 
 class TestSearchParseErrorMessage:
     """SearchParseError surfaces sample reasons when every row fails."""
