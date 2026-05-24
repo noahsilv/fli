@@ -84,12 +84,14 @@ describe("parseAirlines", () => {
   test("invalid code propagates", () => {
     expect(() => parseAirlines(["BA,XXX"])).toThrow(/Invalid airline code: 'XXX'/);
   });
-  test.each<string[]>([[","], [" "], [""], ["", " ", ","]])(
-    "no valid codes throws %#",
-    (...codes) => {
-      expect(() => parseAirlines(codes)).toThrow(/No valid airline codes/);
-    },
-  );
+  test.each<string[]>([
+    [","],
+    [" "],
+    [""],
+    ["", " ", ","],
+  ])("no valid codes throws %#", (...codes) => {
+    expect(() => parseAirlines(codes)).toThrow(/No valid airline codes/);
+  });
 });
 
 describe("parseAlliances", () => {

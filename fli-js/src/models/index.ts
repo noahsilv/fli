@@ -1,3 +1,3 @@
-export { Airline, AIRLINE_NAMES } from "./airline.ts";
-export { Airport, AIRPORT_NAMES } from "./airport.ts";
+export { AIRLINE_NAMES, Airline } from "./airline.ts";
+export { AIRPORT_NAMES, Airport } from "./airport.ts";
 export * from "./google-flights/index.ts";

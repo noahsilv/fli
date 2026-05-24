@@ -5,9 +5,9 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-  TokenBucketRateLimiter,
   configureConcurrency,
   parallelMap,
+  TokenBucketRateLimiter,
 } from "../../src/search/concurrency.ts";
 
 describe("TokenBucketRateLimiter basics", () => {

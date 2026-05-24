@@ -1,7 +1,7 @@
 export {
   type AirportMatch,
-  type MatchType,
   CITY_AIRPORTS,
+  type MatchType,
   searchAirports,
 } from "./airports.ts";
 export {
@@ -11,13 +11,13 @@ export {
   buildTimeRestrictions,
   normalizeDate,
 } from "./builders.ts";
-export { formatIsoDate, ISO_DATE_RE, parseIsoDate } from "./dates.ts";
 export {
   _clearCurrencyCache,
   extractCurrencyFromPriceToken,
   formatPrice,
   formatPriceAxisLabel,
 } from "./currency.ts";
+export { formatIsoDate, ISO_DATE_RE, parseIsoDate } from "./dates.ts";
 export {
   ParseError,
   parseAirlines,

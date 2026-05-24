@@ -15,8 +15,8 @@ import {
   MaxStops,
   SeatType,
   SortBy,
+  TripType,
 } from "../../src/models/google-flights/base.ts";
-import { TripType } from "../../src/models/google-flights/base.ts";
 import { DateSearchFilters } from "../../src/models/google-flights/dates.ts";
 import { FlightSearchFilters } from "../../src/models/google-flights/flights.ts";
 

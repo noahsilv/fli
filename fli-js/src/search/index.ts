@@ -19,8 +19,8 @@ export {
 } from "./exceptions.ts";
 export {
   type BookingOptions,
-  type SearchOptions,
   SearchFlights,
+  type SearchOptions,
 } from "./flights.ts";
 export {
   buildBookingToken,

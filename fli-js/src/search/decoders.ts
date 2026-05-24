@@ -361,5 +361,9 @@ function extractFareName(row: unknown[]): string | null {
 }
 
 // Re-export the internal helpers so tests can exercise them.
-export { tryParseBookingRow as _tryParseBookingRow, safeAirline as _safeAirline };
-export { parseDateTime as _parseDateTime, parseEmissions as _parseEmissions };
+export {
+  parseDateTime as _parseDateTime,
+  parseEmissions as _parseEmissions,
+  safeAirline as _safeAirline,
+  tryParseBookingRow as _tryParseBookingRow,
+};
