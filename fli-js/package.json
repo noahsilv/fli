@@ -78,7 +78,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "zod": "^3.23.8"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
