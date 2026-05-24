@@ -8,9 +8,20 @@ filter encoding, same wire-format decoders.
 
 ## Install
 
+The package is published as `@punitarani/fli`. Install it under the local
+alias `fli` so you can `import … from "fli"`:
+
 ```bash
-bun add @punitarani/fli   # or: npm install @punitarani/fli / pnpm add @punitarani/fli
+npm  i   fli@npm:@punitarani/fli
+# or: pnpm add fli@npm:@punitarani/fli
+# or: yarn add fli@npm:@punitarani/fli
+# or: bun  add fli@npm:@punitarani/fli
 ```
+
+> The `fli@npm:@punitarani/fli` form installs the scoped package under the
+> name `fli` in your `node_modules`, so every import below resolves as
+> `"fli"`. Prefer the scoped name directly? Install `@punitarani/fli` and
+> import from `"@punitarani/fli"` instead.
 
 ## Quick start
 
@@ -24,7 +35,7 @@ import {
   SearchFlights,
   SeatType,
   SortBy,
-} from "@punitarani/fli";
+} from "fli";
 
 const filters = new FlightSearchFilters({
   passenger_info: { adults: 1, children: 0, infants_in_seat: 0, infants_on_lap: 0 },
@@ -47,7 +58,7 @@ console.log(results);
 ### Date-range search
 
 ```ts
-import { Airport, DateSearchFilters, FlightSegment, SearchDates } from "@punitarani/fli";
+import { Airport, DateSearchFilters, FlightSegment, SearchDates } from "fli";
 
 const filters = new DateSearchFilters({
   passenger_info: { adults: 1, children: 0, infants_in_seat: 0, infants_on_lap: 0 },
@@ -77,7 +88,7 @@ The TypeScript port uses native `fetch` (Bun's built-in) and replaces
   explicit `proxy` option on `new Client({...})`).
 
 ```ts
-import { Client, SearchFlights } from "@punitarani/fli";
+import { Client, SearchFlights } from "fli";
 
 const search = new SearchFlights(
   new Client({ proxy: "http://user:pass@proxy.example.com:8080" }),
