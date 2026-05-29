@@ -4,6 +4,7 @@
  * 1:1 port of fli/search/flights.py.
  */
 
+import type { GoogleFlightsUrlOptions } from "../core/links.ts";
 import type { BookingOption, FlightResult } from "../models/google-flights/base.ts";
 import { TripType } from "../models/google-flights/base.ts";
 import { FlightSearchFilters } from "../models/google-flights/flights.ts";
@@ -30,11 +31,8 @@ export interface BookingOptions {
   sessionId?: string | null;
 }
 
-export interface BookingUrlOptions {
-  currency?: string | null;
-  language?: string | null;
-  country?: string | null;
-}
+/** Locale knobs for {@link SearchFlights.buildFlightBookingUrl} (alias of the core options). */
+export type BookingUrlOptions = GoogleFlightsUrlOptions;
 
 export class SearchFlights {
   static readonly BASE_URL =
@@ -228,7 +226,9 @@ export class SearchFlights {
     options: BookingUrlOptions = {},
   ): string {
     const results: FlightResult[] = Array.isArray(flight) ? flight : [flight];
-    const isOneWay = results.length === 1;
+    // Round-trip is exactly 2 segments; one-way and multi-city (3+) both use
+    // isOneWay=true (f19=2). Only round-trip sets f19=1.
+    const isOneWay = results.length !== 2;
 
     const iata = (x: unknown): string => String(x).replace(/^_/, "");
     // Match the decoder, which stores datetimes with local components

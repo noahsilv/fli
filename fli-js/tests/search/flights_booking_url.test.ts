@@ -147,6 +147,35 @@ describe("buildFlightBookingUrl", () => {
     expect(count).toBeGreaterThanOrEqual(2);
   });
 
+  test("multi-city (3 segments) encodes f19=2 (one-way), not round-trip", () => {
+    const multiCity: FlightResult[] = [
+      {
+        legs: [makeLeg(Airline.AA, "1", Airport.JFK, Airport.LAX, "2026-09-01")],
+        price: 100,
+        currency: "USD",
+        duration: 120,
+        stops: 0,
+      },
+      {
+        legs: [makeLeg(Airline.AA, "2", Airport.LAX, Airport.ORD, "2026-09-05")],
+        price: 100,
+        currency: "USD",
+        duration: 120,
+        stops: 0,
+      },
+      {
+        legs: [makeLeg(Airline.AA, "3", Airport.ORD, Airport.JFK, "2026-09-10")],
+        price: 100,
+        currency: "USD",
+        duration: 120,
+        stops: 0,
+      },
+    ];
+    const raw = tfsBytes(search.buildFlightBookingUrl(multiCity));
+    // f19 tag 0x98 0x01, value 2 (one-way/multi-city) — must not be 1 (round-trip).
+    expect(Array.from(raw.slice(-3))).toEqual([0x98, 0x01, 0x02]);
+  });
+
   test("digit-prefixed airline code strips the underscore", () => {
     const flight = oneWay(Airline._3F, "101");
     const text = Buffer.from(tfsBytes(search.buildFlightBookingUrl(flight))).toString("latin1");
