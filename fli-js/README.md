@@ -65,6 +65,35 @@ const filters = new DateSearchFilters({
 const dates = await new SearchDates().search(filters);
 ```
 
+### Booking links
+
+Turn search results into clickable Google Flights links — no extra network
+call, fully deterministic.
+
+```ts
+import { googleFlightsUrl, SearchFlights } from "fli-js";
+
+const search = new SearchFlights();
+const results = await search.search(filters, { currency: "USD" });
+
+// Per-flight deep link: opens the specific itinerary's booking page
+// (vendor fares + "Continue" CTA) via a `tfs` protobuf token.
+const first = results?.[0];
+if (first) {
+  console.log(search.buildFlightBookingUrl(first, { currency: "USD" }));
+  // https://www.google.com/travel/flights/booking?tfs=…&curr=USD
+}
+
+// Search-level deep link: route + dates pre-filled (handy for a date result
+// or a quick "view on Google Flights" link).
+console.log(googleFlightsUrl("JFK", "LHR", "2026-12-25", null, { currency: "USD" }));
+// https://www.google.com/travel/flights?q=Flights%20from%20JFK%20to%20LHR%20on%202026-12-25&curr=USD
+```
+
+`buildFlightBookingUrl` accepts a single `FlightResult` (one-way) or an array
+of them (round-trip / multi-city). It never throws — on malformed input it
+falls back to the generic Google Flights URL.
+
 ## HTTP / proxy configuration
 
 The TypeScript port uses native `fetch` (Bun's built-in) and replaces
@@ -92,9 +121,10 @@ Set the per-request timeout with `FLI_TIMEOUT=30` (seconds) or via the
 - `fli-js/models` — `Airport`, `Airline`, `FlightSearchFilters`, `DateSearchFilters`,
   `FlightSegment`, `FlightResult`, `BookingOption`, all enums.
 - `fli-js/core` — string-to-enum parsers, segment builders, airport search,
-  currency token decoders.
-- `fli-js/search` — `SearchFlights`, `SearchDates`, `Client`, error classes,
-  protobuf token helpers (`buildBookingToken`, `extractBookingTokenFromTfu`).
+  currency token decoders, deep-link builder (`googleFlightsUrl`).
+- `fli-js/search` — `SearchFlights` (incl. `buildFlightBookingUrl`),
+  `SearchDates`, `Client`, error classes, protobuf token helpers
+  (`buildBookingToken`, `buildTfsToken`, `extractBookingTokenFromTfu`).
 
 ## Development
 
@@ -116,8 +146,10 @@ Python upstream:
 
 - `FlightSearchFilters.format()` produces structurally identical
   nested-list payloads (see `tests/integration/filter_format_snapshots.test.ts`).
-- `buildBookingToken(...)` reproduces a captured live booking-page token
-  byte-for-byte (see `tests/search/proto.test.ts`).
+- `buildBookingToken(...)` and `buildTfsToken(...)` reproduce captured live
+  booking-page tokens byte-for-byte (see `tests/search/proto.test.ts`); the
+  resulting `buildFlightBookingUrl(...)` output matches the Python library
+  character-for-character.
 - The wire-format parser handles both the legacy single-chunk JSONP
   shape and the multi-chunk format used by `GetBookingResults`.
 

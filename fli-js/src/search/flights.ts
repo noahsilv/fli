@@ -11,7 +11,7 @@ import { type Client, getClient } from "./client.ts";
 import { parallelMap } from "./concurrency.ts";
 import { parseBookingChunk, parseFlightRow } from "./decoders.ts";
 import { SearchParseError } from "./exceptions.ts";
-import { buildBookingToken } from "./proto.ts";
+import { buildBookingToken, buildTfsToken, type LegSpec } from "./proto.ts";
 import { withLocaleParams } from "./urls.ts";
 import { iterWrbChunks, parseFirstWrbPayload } from "./wire.ts";
 
@@ -28,6 +28,12 @@ export interface BookingOptions {
   country?: string | null;
   bookingToken?: string | null;
   sessionId?: string | null;
+}
+
+export interface BookingUrlOptions {
+  currency?: string | null;
+  language?: string | null;
+  country?: string | null;
 }
 
 export class SearchFlights {
@@ -199,6 +205,64 @@ export class SearchFlights {
     const out: BookingOption[] = [];
     for (const chunkOptions of parsed) out.push(...chunkOptions);
     return out;
+  }
+
+  /**
+   * Build a Google Flights deep-link URL for a specific itinerary.
+   *
+   * Constructs `https://www.google.com/travel/flights/booking?tfs=…` that opens
+   * the booking page pre-loaded with the given itinerary — the airline/OTA fare
+   * options and the "Continue" booking CTA included.
+   *
+   * The `tfs` itinerary token is fully deterministic (built from the flight's
+   * airports, dates and flight numbers); no session id or network round-trip is
+   * required, so the same itinerary always yields the same URL. This method
+   * never throws — on malformed input it falls back to the generic Google
+   * Flights URL.
+   *
+   * @param flight A single `FlightResult` (one-way / single segment) or an
+   *   array of them (round-trip / multi-city, one element per travel direction).
+   */
+  buildFlightBookingUrl(
+    flight: FlightResult | FlightResult[],
+    options: BookingUrlOptions = {},
+  ): string {
+    const results: FlightResult[] = Array.isArray(flight) ? flight : [flight];
+    const isOneWay = results.length === 1;
+
+    const iata = (x: unknown): string => String(x).replace(/^_/, "");
+    // Match the decoder, which stores datetimes with local components
+    // (new Date(y, m-1, d, h, min)); read them back the same way.
+    const depDate = (d: Date): string => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+
+    let url: string;
+    try {
+      const segments: LegSpec[][] = results.map((result) =>
+        result.legs.map((leg) => ({
+          origin: iata(leg.departure_airport),
+          depDate: depDate(leg.departure_datetime),
+          dest: iata(leg.arrival_airport),
+          airline: iata(leg.airline),
+          flightNumber: leg.flight_number,
+        })),
+      );
+      const tfs = buildTfsToken(segments, { isOneWay });
+      url = `https://www.google.com/travel/flights/booking?tfs=${tfs}`;
+    } catch {
+      url = "https://www.google.com/travel/flights";
+    }
+
+    return withLocaleParams(
+      url,
+      options.currency ?? null,
+      options.language ?? null,
+      options.country ?? null,
+    );
   }
 
   private _captureSessionId(inner: unknown): void {

@@ -19,14 +19,18 @@ export {
 } from "./exceptions.ts";
 export {
   type BookingOptions,
+  type BookingUrlOptions,
   SearchFlights,
   type SearchOptions,
 } from "./flights.ts";
 export {
+  type BuildTfsTokenOptions,
   buildBookingToken,
+  buildTfsToken,
   decodeBookingToken,
   extractBookingTokenFromTfu,
   extractSessionIdFromTfu,
+  type LegSpec,
 } from "./proto.ts";
 export { withLocaleParams } from "./urls.ts";
 export { iterWrbChunks, parseFirstWrbPayload } from "./wire.ts";

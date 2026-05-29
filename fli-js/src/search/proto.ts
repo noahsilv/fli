@@ -288,3 +288,124 @@ export function extractSessionIdFromTfu(tfu: string): string {
   }
   return session;
 }
+
+// ---------------------------------------------------------------------------
+// Deep-link URL parameter builder (tfs)
+// ---------------------------------------------------------------------------
+
+/**
+ * Encode a non-negative BigInt as a protobuf varint.
+ *
+ * The `number`-based {@link varint} cannot represent values above
+ * `Number.MAX_SAFE_INTEGER`; the `tfs` token's f16 field is max-uint64, so it
+ * needs a BigInt encoder.
+ */
+function varintBig(value: bigint): Uint8Array {
+  if (value < 0n) throw new Error("varint encoder takes non-negative ints only");
+  const bytes: number[] = [];
+  let v = value;
+  while (true) {
+    const byte = Number(v & 0x7fn);
+    v >>= 7n;
+    if (v > 0n) {
+      bytes.push(byte | 0x80);
+    } else {
+      bytes.push(byte);
+      break;
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
+/**
+ * Encode bytes as URL-safe base64 without `=` padding.
+ *
+ * The `tfs` query parameter uses the urlsafe alphabet (`-`/`_`) with padding
+ * stripped.
+ */
+function toUrlsafeB64(bytes: Uint8Array): string {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(bytes).toString("base64url");
+  }
+  return base64Encode(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** One physical leg within a booking-URL segment. */
+export interface LegSpec {
+  /** IATA code of the departure airport (e.g. `"SFO"`). */
+  origin: string;
+  /** Departure date in `YYYY-MM-DD` format. */
+  depDate: string;
+  /** IATA code of the arrival airport (e.g. `"PHX"`). */
+  dest: string;
+  /** Airline IATA code (e.g. `"AA"`). */
+  airline: string;
+  /** Flight number string (e.g. `"2413"`). */
+  flightNumber: string;
+}
+
+export interface BuildTfsTokenOptions {
+  /** `true` for one-way (incl. multi-city); `false` for round-trip. */
+  isOneWay?: boolean;
+}
+
+/**
+ * Build the `tfs` query parameter for a Google Flights deep-link URL.
+ *
+ * The `tfs` token encodes the complete itinerary — one segment per travel
+ * direction, each segment containing one leg per physical flight. It is
+ * deterministic (no session id required) and can be constructed purely from
+ * search-result data.
+ *
+ * 1:1 port of fli/search/_proto.py::build_tfs_token.
+ *
+ * @throws Error when `segments` is empty or any segment has no legs.
+ */
+export function buildTfsToken(segments: LegSpec[][], options: BuildTfsTokenOptions = {}): string {
+  const isOneWay = options.isOneWay ?? true;
+  if (segments.length === 0) throw new Error("segments must be non-empty");
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    if (!seg || seg.length === 0) throw new Error(`segment ${i} has no legs`);
+  }
+
+  let segmentProtos: Uint8Array = new Uint8Array(0);
+  for (const seg of segments) {
+    let legsProto: Uint8Array = new Uint8Array(0);
+    for (const leg of seg) {
+      const legProto = concatBytes(
+        lengthDelim(1, utf8.encode(leg.origin)),
+        lengthDelim(2, utf8.encode(leg.depDate)),
+        lengthDelim(3, utf8.encode(leg.dest)),
+        lengthDelim(5, utf8.encode(leg.airline)),
+        lengthDelim(6, utf8.encode(leg.flightNumber)),
+      );
+      legsProto = concatBytes(legsProto, lengthDelim(4, legProto));
+    }
+
+    const first = seg[0] as LegSpec;
+    const last = seg[seg.length - 1] as LegSpec;
+    const segProto = concatBytes(
+      lengthDelim(2, utf8.encode(first.depDate)),
+      legsProto,
+      lengthDelim(13, concatBytes(varintField(1, 1), lengthDelim(2, utf8.encode(first.origin)))),
+      lengthDelim(14, concatBytes(varintField(1, 1), lengthDelim(2, utf8.encode(last.dest)))),
+    );
+    segmentProtos = concatBytes(segmentProtos, lengthDelim(3, segProto));
+  }
+
+  const MAX_U64 = (1n << 64n) - 1n;
+  const f19 = isOneWay ? 2 : 1;
+
+  const payload = concatBytes(
+    varintField(1, 28),
+    varintField(2, 2),
+    segmentProtos,
+    varintField(8, 1),
+    varintField(9, 1),
+    varintField(14, 1),
+    lengthDelim(16, concatBytes(tag(1, 0), varintBig(MAX_U64))),
+    varintField(19, f19),
+  );
+  return toUrlsafeB64(payload);
+}

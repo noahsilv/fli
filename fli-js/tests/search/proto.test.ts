@@ -10,9 +10,11 @@ import { Buffer } from "node:buffer";
 import {
   _readVarint,
   buildBookingToken,
+  buildTfsToken,
   decodeBookingToken,
   extractBookingTokenFromTfu,
   extractSessionIdFromTfu,
+  type LegSpec,
 } from "../../src/search/proto.ts";
 
 // Captured live 2026-05-14 (JFK → LAX outbound AA171, return AA28, RT $346.80).
@@ -252,5 +254,105 @@ describe("extractBookingTokenFromTfu", () => {
     expect(() =>
       extractBookingTokenFromTfu("https://www.google.com/travel/flights/booking?tfs=ABC&hl=en"),
     ).toThrow();
+  });
+});
+
+// Captured live 2026-05-28 — byte-perfect golden references for the tfs token.
+// Round-trip JFK→LAX (AA171 out, AA28 return).
+const LIVE_TFS_RT =
+  "CBwQAho_EgoyMDI2LTA3LTE1Ih8KA0pGSxIKMjAyNi0wNy0xNRoDTEFYKgJBQTIDMTcxagcIAR" +
+  "IDSkZLcgcIARIDTEFYGj4SCjIwMjYtMDctMTkiHgoDTEFYEgoyMDI2LTA3LTE5GgNKRksqAkFBMgIy" +
+  "OGoHCAESA0xBWHIHCAESA0pGS0ABSAFwAYIBCwj___________8BmAEB";
+// One-way nonstop LAX→ORD (UA729).
+const LIVE_TFS_OW =
+  "CBwQAho_EgoyMDI2LTA4LTE1Ih8KA0xBWBIKMjAyNi0wOC0xNRoDT1JEKgJVQTIDNzI5" +
+  "agcIARIDTEFYcgcIARIDT1JEQAFIAXABggELCP___________wGYAQI";
+// One-way 2-stop BOS→DEN(WN739)→SJC(WN389)→SEA(WN389).
+const LIVE_TFS_3LEG =
+  "CBwQAhqBARIKMjAyNi0wOC0xNSIfCgNCT1MSCjIwMjYtMDgtMTUaA0RFTioCV04yAzczOSIfCgNERU4S" +
+  "CjIwMjYtMDgtMTUaA1NKQyoCV04yAzM4OSIfCgNTSkMSCjIwMjYtMDgtMTUaA1NFQSoCV04yAzM4OWoH" +
+  "CAESA0JPU3IHCAESA1NFQUABSAFwAYIBCwj___________8BmAEC";
+
+function tfsBytes(tfs: string): Uint8Array {
+  return decodeUrlsafe(tfs);
+}
+
+describe("buildTfsToken", () => {
+  test("round-trip reproduces captured tfs byte-for-byte", () => {
+    const segments: LegSpec[][] = [
+      [{ origin: "JFK", depDate: "2026-07-15", dest: "LAX", airline: "AA", flightNumber: "171" }],
+      [{ origin: "LAX", depDate: "2026-07-19", dest: "JFK", airline: "AA", flightNumber: "28" }],
+    ];
+    const built = buildTfsToken(segments, { isOneWay: false });
+    expect([...tfsBytes(built)]).toEqual([...tfsBytes(LIVE_TFS_RT)]);
+  });
+
+  test("one-way nonstop reproduces captured tfs byte-for-byte", () => {
+    const segments: LegSpec[][] = [
+      [{ origin: "LAX", depDate: "2026-08-15", dest: "ORD", airline: "UA", flightNumber: "729" }],
+    ];
+    const built = buildTfsToken(segments, { isOneWay: true });
+    expect([...tfsBytes(built)]).toEqual([...tfsBytes(LIVE_TFS_OW)]);
+  });
+
+  test("multi-leg connection reproduces captured tfs byte-for-byte", () => {
+    const segments: LegSpec[][] = [
+      [
+        { origin: "BOS", depDate: "2026-08-15", dest: "DEN", airline: "WN", flightNumber: "739" },
+        { origin: "DEN", depDate: "2026-08-15", dest: "SJC", airline: "WN", flightNumber: "389" },
+        { origin: "SJC", depDate: "2026-08-15", dest: "SEA", airline: "WN", flightNumber: "389" },
+      ],
+    ];
+    const built = buildTfsToken(segments, { isOneWay: true });
+    expect([...tfsBytes(built)]).toEqual([...tfsBytes(LIVE_TFS_3LEG)]);
+  });
+
+  test("f19 is 2 for one-way", () => {
+    const built = buildTfsToken(
+      [[{ origin: "SFO", depDate: "2026-09-01", dest: "PHX", airline: "AA", flightNumber: "100" }]],
+      { isOneWay: true },
+    );
+    const raw = tfsBytes(built);
+    expect(Array.from(raw.slice(-3))).toEqual([0x98, 0x01, 0x02]);
+  });
+
+  test("f19 is 1 for round-trip", () => {
+    const built = buildTfsToken(
+      [
+        [{ origin: "JFK", depDate: "2026-09-01", dest: "LAX", airline: "AA", flightNumber: "1" }],
+        [{ origin: "LAX", depDate: "2026-09-08", dest: "JFK", airline: "AA", flightNumber: "2" }],
+      ],
+      { isOneWay: false },
+    );
+    const raw = tfsBytes(built);
+    expect(Array.from(raw.slice(-3))).toEqual([0x98, 0x01, 0x01]);
+  });
+
+  test("urlsafe, no padding", () => {
+    const built = buildTfsToken([
+      [{ origin: "SFO", depDate: "2026-09-01", dest: "PHX", airline: "AA", flightNumber: "100" }],
+    ]);
+    expect(built.includes("=")).toBe(false);
+    expect(built.includes("+")).toBe(false);
+    expect(built.includes("/")).toBe(false);
+  });
+
+  test("three legs encode to 159 bytes", () => {
+    const segments: LegSpec[][] = [
+      [
+        { origin: "BOS", depDate: "2026-08-15", dest: "DEN", airline: "WN", flightNumber: "739" },
+        { origin: "DEN", depDate: "2026-08-15", dest: "SJC", airline: "WN", flightNumber: "389" },
+        { origin: "SJC", depDate: "2026-08-15", dest: "SEA", airline: "WN", flightNumber: "389" },
+      ],
+    ];
+    expect(tfsBytes(buildTfsToken(segments, { isOneWay: true })).length).toBe(159);
+  });
+
+  test("empty segments throws", () => {
+    expect(() => buildTfsToken([])).toThrow("non-empty");
+  });
+
+  test("empty leg list throws", () => {
+    expect(() => buildTfsToken([[]])).toThrow("no legs");
   });
 });
