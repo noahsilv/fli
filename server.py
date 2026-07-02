@@ -1,20 +1,18 @@
 """
-Root entrypoint for FLI MCP server.
+Prefect Horizon entrypoint for FLI MCP.
 
-For Prefect Horizon, use:
+Horizon entrypoint:
     server.py:mcp
-
-For local HTTP testing, run:
-    python server.py
 """
 
-from fli.mcp.server import mcp, run_http
+import os
 
-
-def main() -> None:
-    """Run the MCP server locally over HTTP."""
-    run_http()
+from fli.mcp.server import mcp
 
 
 if __name__ == "__main__":
-    main()
+    mcp.run(
+        transport="http",
+        host=os.getenv("HOST", "0.0.0.0"),
+        port=int(os.getenv("PORT", "8000")),
+    )
